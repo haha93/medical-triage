@@ -111,9 +111,9 @@ The baseline uses `gpt-4o-mini` with temperature 0 and a fixed seed for reproduc
 
 | Task | Score |
 |---|---|
-| Easy | TBD |
-| Medium | TBD |
-| Hard | TBD |
+| Easy | 0.550 |
+| Medium | 0.568 |
+| Hard | 0.451 |
 
 ## Example Usage
 
