@@ -1,0 +1,15 @@
+name: medical-triage
+description: "AI agent medical triage environment - assign urgency levels, route to departments, recommend initial clinical actions for emergency room patients"
+version: "1.0.0"
+author: "hackathon-team"
+tags: ["openenv", "medical", "triage", "healthcare"]
+tasks:
+  - id: easy
+    description: "Single clear symptom, obvious triage decisions"
+  - id: medium
+    description: "Multiple symptoms with diagnostic ambiguity"
+  - id: hard
+    description: "Complex multi-condition patients with conflicting indicators"
+observation_model: "app.models.Observation"
+action_model: "app.models.Action"
+reward_model: "app.models.Reward"
