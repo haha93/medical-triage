@@ -1,5 +1,7 @@
 """FastAPI server for the OpenEnv Medical Triage environment."""
 
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -11,13 +13,15 @@ env = TriageEnvironment()
 
 
 class ResetRequest(BaseModel):
-    task_id: str
+    task_id: str = "easy"
     seed: int = 42
 
 
 @app.post("/reset", response_model=Observation)
-def reset(request: ResetRequest) -> Observation:
+def reset(request: Optional[ResetRequest] = None) -> Observation:
     """Reset the environment with a new task and return the first observation."""
+    if request is None:
+        request = ResetRequest()
     try:
         return env.reset(request.task_id, request.seed)
     except ValueError:
