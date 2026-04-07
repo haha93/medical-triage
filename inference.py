@@ -1,4 +1,4 @@
-"""Baseline inference script for the OpenEnv Medical Triage environment."""
+"""Inference script for the OpenEnv Medical Triage environment."""
 
 import json
 import logging
@@ -7,6 +7,11 @@ import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- Environment variables (required by the hackathon pipeline) ---
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "openai/gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 VALID_DEPARTMENTS = [
     "emergency", "cardiology", "orthopedics", "neurology",
@@ -81,23 +86,23 @@ def run_inference(base_url: str) -> dict:
     except ImportError:
         raise RuntimeError("httpx is required: pip install httpx")
 
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
-
     try:
         from openai import OpenAI
     except ImportError:
         raise RuntimeError("openai is required: pip install openai")
 
-    client = OpenAI(api_key=api_key)
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is not set")
+
+    # Configure OpenAI client with HF Inference API
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
     scores = {}
     task_ids = ["easy", "medium", "hard"]
 
     with httpx.Client(timeout=120.0) as http:
         for task_id in task_ids:
-            logger.info(f"Running task: {task_id}")
+            print(f"START task={task_id}", flush=True)
             try:
                 reset_resp = http.post(
                     f"{base_url}/reset",
@@ -114,7 +119,7 @@ def run_inference(base_url: str) -> dict:
 
                     try:
                         response = client.chat.completions.create(
-                            model="gpt-4o-mini",
+                            model=MODEL_NAME,
                             messages=[
                                 {
                                     "role": "system",
@@ -127,7 +132,7 @@ def run_inference(base_url: str) -> dict:
                         text = response.choices[0].message.content or ""
                         action = parse_response(text)
                     except Exception:
-                        logger.exception("OpenAI API call failed, using fallback")
+                        logger.exception("LLM API call failed, using fallback")
                         action = {
                             "urgency_level": 3,
                             "department": "general_medicine",
@@ -139,22 +144,25 @@ def run_inference(base_url: str) -> dict:
                     step_data = step_resp.json()
 
                     done = step_data["done"]
+                    reward = step_data["reward"]["total"]
+                    print(
+                        f"STEP task={task_id} step={step_count} reward={reward:.3f} done={done}",
+                        flush=True,
+                    )
+
                     if not done:
                         observation = step_data["observation"]
-
-                    logger.info(
-                        f"  Step {step_count}: reward={step_data['reward']['total']:.3f}, done={done}"
-                    )
 
                 grader_resp = http.get(f"{base_url}/grader")
                 grader_resp.raise_for_status()
                 score = grader_resp.json()["score"]
                 scores[task_id] = score
-                logger.info(f"Task {task_id} score: {score:.3f}")
+                print(f"END task={task_id} score={score:.3f}", flush=True)
 
             except Exception:
                 logger.exception(f"Failed to run task {task_id}")
                 scores[task_id] = 0.0
+                print(f"END task={task_id} score=0.000", flush=True)
 
     return scores
 
