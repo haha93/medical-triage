@@ -102,7 +102,7 @@ def run_inference(base_url: str) -> dict:
 
     with httpx.Client(timeout=120.0) as http:
         for task_id in task_ids:
-            print(f"START task={task_id}", flush=True)
+            print(f"[START] task={task_id}", flush=True)
             try:
                 reset_resp = http.post(
                     f"{base_url}/reset",
@@ -146,7 +146,7 @@ def run_inference(base_url: str) -> dict:
                     done = step_data["done"]
                     reward = step_data["reward"]["total"]
                     print(
-                        f"STEP task={task_id} step={step_count} reward={reward:.3f} done={done}",
+                        f"[STEP] task={task_id} step={step_count} reward={reward:.3f} done={done}",
                         flush=True,
                     )
 
@@ -157,12 +157,12 @@ def run_inference(base_url: str) -> dict:
                 grader_resp.raise_for_status()
                 score = grader_resp.json()["score"]
                 scores[task_id] = score
-                print(f"END task={task_id} score={score:.3f}", flush=True)
+                print(f"[END] task={task_id} score={score:.3f} steps={step_count}", flush=True)
 
             except Exception:
                 logger.exception(f"Failed to run task {task_id}")
                 scores[task_id] = 0.0
-                print(f"END task={task_id} score=0.000", flush=True)
+                print(f"[END] task={task_id} score=0.000 steps=0", flush=True)
 
     return scores
 
