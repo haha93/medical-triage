@@ -5,8 +5,6 @@ import logging
 import os
 import sys
 
-import httpx
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -78,12 +76,20 @@ def parse_response(response_text: str) -> dict:
 
 
 def run_inference(base_url: str) -> dict:
+    try:
+        import httpx
+    except ImportError:
+        raise RuntimeError("httpx is required: pip install httpx")
+
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable is not set")
-        sys.exit(1)
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
 
-    from openai import OpenAI
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("openai is required: pip install openai")
+
     client = OpenAI(api_key=api_key)
 
     scores = {}
@@ -93,7 +99,10 @@ def run_inference(base_url: str) -> dict:
         for task_id in task_ids:
             logger.info(f"Running task: {task_id}")
             try:
-                reset_resp = http.post(f"{base_url}/reset", json={"task_id": task_id, "seed": 42})
+                reset_resp = http.post(
+                    f"{base_url}/reset",
+                    json={"task_id": task_id, "seed": 42},
+                )
                 reset_resp.raise_for_status()
                 observation = reset_resp.json()
 
@@ -107,7 +116,10 @@ def run_inference(base_url: str) -> dict:
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "You are a medical triage assistant. Respond ONLY with a JSON object, no other text."},
+                                {
+                                    "role": "system",
+                                    "content": "You are a medical triage assistant. Respond ONLY with a JSON object, no other text.",
+                                },
                                 {"role": "user", "content": prompt},
                             ],
                             temperature=0,
@@ -116,7 +128,11 @@ def run_inference(base_url: str) -> dict:
                         action = parse_response(text)
                     except Exception:
                         logger.exception("OpenAI API call failed, using fallback")
-                        action = {"urgency_level": 3, "department": "general_medicine", "initial_actions": ["monitor_vitals"]}
+                        action = {
+                            "urgency_level": 3,
+                            "department": "general_medicine",
+                            "initial_actions": ["monitor_vitals"],
+                        }
 
                     step_resp = http.post(f"{base_url}/step", json=action)
                     step_resp.raise_for_status()
@@ -126,7 +142,9 @@ def run_inference(base_url: str) -> dict:
                     if not done:
                         observation = step_data["observation"]
 
-                    logger.info(f"  Step {step_count}: reward={step_data['reward']['total']:.3f}, done={done}")
+                    logger.info(
+                        f"  Step {step_count}: reward={step_data['reward']['total']:.3f}, done={done}"
+                    )
 
                 grader_resp = http.get(f"{base_url}/grader")
                 grader_resp.raise_for_status()
@@ -142,6 +160,11 @@ def run_inference(base_url: str) -> dict:
 
 
 if __name__ == "__main__":
-    base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:7860"
-    scores = run_inference(base_url)
-    print(json.dumps(scores, indent=2))
+    try:
+        base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:7860"
+        scores = run_inference(base_url)
+        print(json.dumps(scores, indent=2))
+    except Exception as exc:
+        logger.error("Inference failed: %s", exc)
+        print(json.dumps({"error": str(exc)}))
+        sys.exit(1)

@@ -6,7 +6,7 @@ from app.models import Action, GroundTruth, Reward
 class TriageGrader:
     URGENCY_WEIGHT: float = 0.4
     DEPARTMENT_WEIGHT: float = 0.3
-    ACTIONS_WEIGHT: float = 0.3
+    ACTIONS_WEIGHT: float = 0.2
     SAFETY_PENALTY_VALUE: float = 0.1
 
     def grade(self, action: Action, ground_truth: GroundTruth) -> Reward:
